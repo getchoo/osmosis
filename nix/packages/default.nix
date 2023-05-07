@@ -4,7 +4,8 @@
   ...
 }: {
   perSystem = {pkgs, ...}: let
-    inherit (pkgs) callPackage;
+    inherit (pkgs) callPackage dockerTools;
+    inherit (dockerTools) buildLayeredImage;
 
     version = builtins.substring 0 8 self.lastModifiedDate;
 
@@ -37,6 +38,15 @@
     ];
 
     mkOsmosis = args: callPackage ./osmosis.nix ({inherit version;} // args);
+    mkOsmosisDocker = osmosis:
+      buildLayeredImage {
+        name = "${osmosis.pname}-docker";
+        tag = version;
+        contents = [
+          dockerTools.caCertificates
+        ];
+        config.Cmd = ["${osmosis}/bin/osmosis"];
+      };
   in {
     packages = rec {
       coremltools = callPackage ./coremltools.nix {};
@@ -49,10 +59,14 @@
         inherit osmosis-frontend coremltools;
       };
 
+      osmosis-nvidia-docker = mkOsmosisDocker osmosis-nvidia;
+
       osmosis-amd = mkOsmosis {
         aipython3 = aipython3-amd;
         inherit osmosis-frontend coremltools;
       };
+
+      osmosis-amd-docker = mkOsmosisDocker osmosis-amd;
     };
   };
 }
